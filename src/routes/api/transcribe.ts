@@ -28,7 +28,8 @@ export const Route = createFileRoute("/api/transcribe")({
         upstream.append("file", new File([file], file.name, { type }), file.name);
         upstream.append("response_format", "json");
         upstream.append("stream", "true");
-        upstream.append("languages", "ja");
+        const lang = String(form.get("lang") || "");
+        if (/^[a-z]{2}$/.test(lang)) upstream.append("languages", lang);
 
         const res = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
           method: "POST",

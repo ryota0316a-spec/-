@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText, Output } from "ai";
 import { z } from "zod";
+import { LANGS, isLang } from "@/lib/i18n";
 
 const schema = z.object({
   summary: z.array(z.string()),
@@ -15,7 +16,8 @@ export const Route = createFileRoute("/api/summarize")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { text } = (await request.json()) as { text?: string };
+        const { text, lang: l } = (await request.json()) as { text?: string; lang?: string };
+        const L = LANGS[isLang(l) ? l : "ja"];
         if (!text || text.trim().length < 10)
           return Response.json({ error: "テキストが短すぎます。" }, { status: 400 });
         const apiKey = process.env["LOVABLE_API_KEY"];
@@ -30,7 +32,7 @@ export const Route = createFileRoute("/api/summarize")({
           const result = streamText({
             model: provider.responses("openai/gpt-6-astra"),
             system:
-              "あなたは優秀なビジネスアシスタントです。会議・商談の書き起こしやメモを読み、日本語で簡潔に整理してください。summaryは要点の箇条書き(3〜6個)、decisionsは合意・決定した内容、actionsは次回アクション(task/owner/due)。担当者や期限が不明な場合は「未定」としてください。",
+              `You are an excellent business assistant. Read the meeting/sales-call transcript or notes and organize them concisely. Write ALL output strictly in ${L.ai}, regardless of the transcript's language. summary: 3-6 key bullet points; decisions: what was agreed; actions: next tasks (task/owner/due). If an owner or due date is unknown, use "${L.tbd}".`,
             prompt: text.slice(0, 60000),
             output: Output.object({ schema }),
             abortSignal: request.signal,

@@ -44,9 +44,10 @@ export async function recordWav(onLevel?: (v: number) => void) {
   };
 }
 
-export async function transcribeFile(file: File, onDelta?: (t: string) => void): Promise<string> {
+export async function transcribeFile(file: File, lang: string, onDelta?: (t: string) => void): Promise<string> {
   const fd = new FormData();
   fd.append("file", file, file.name);
+  fd.append("lang", lang);
   const res = await fetch("/api/transcribe", { method: "POST", body: fd });
   if (!res.ok || !res.body) {
     let msg = "文字起こしに失敗しました。";
