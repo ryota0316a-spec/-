@@ -325,3 +325,43 @@
 @keyframes shimmer {
   to { background-position: -200% 0; }
 }
+
+@utility btn-record {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+  padding: 1rem 1.25rem; border-radius: 0.9rem; font-size: 0.9rem; font-weight: 600;
+  color: var(--foreground);
+  background: linear-gradient(135deg, oklch(0.65 0.22 25 / 22%), oklch(0.6 0.2 330 / 14%));
+  border: 1px solid oklch(0.7 0.2 20 / 40%);
+  box-shadow: 0 0 30px -8px oklch(0.65 0.22 25 / 50%), inset 0 1px 0 oklch(1 0 0 / 10%);
+  transition: all .2s;
+  &:hover { box-shadow: 0 0 40px -6px oklch(0.65 0.22 25 / 70%), inset 0 1px 0 oklch(1 0 0 / 14%); }
+  &:disabled { opacity: .4; cursor: not-allowed; }
+  &.is-recording { animation: rec-glow 1.6s ease-in-out infinite; }
+}
+@utility rec-dot {
+  width: .55rem; height: .55rem; border-radius: 999px; background: oklch(0.68 0.24 25);
+  box-shadow: 0 0 12px oklch(0.68 0.24 25); transition: transform .08s;
+}
+@keyframes rec-glow { 50% { box-shadow: 0 0 60px -4px oklch(0.65 0.24 25 / 85%), inset 0 1px 0 oklch(1 0 0 / 14%); } }
+@utility dropzone {
+  display: flex; flex-direction: column; align-items: center; gap: .35rem; padding: 1.5rem;
+  border-radius: 0.9rem; border: 1.5px dashed oklch(1 0 0 / 16%); background: oklch(1 0 0 / 3%);
+  cursor: pointer; transition: all .2s;
+  &:hover, &.is-drag { border-color: var(--primary); background: oklch(1 0 0 / 6%); box-shadow: 0 0 40px -12px var(--primary); }
+}
+@utility processing-overlay {
+  position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 2rem; background: oklch(0.08 0.01 270 / 82%); backdrop-filter: blur(18px); animation: fade-in .3s ease;
+}
+@utility orb {
+  position: relative; width: 6rem; height: 6rem;
+  & span { position: absolute; inset: 0; border-radius: 999px; border: 2px solid transparent; }
+  & span:nth-child(1) { border-top-color: var(--primary); animation: spin 1.2s linear infinite; }
+  & span:nth-child(2) { inset: .6rem; border-right-color: oklch(0.72 0.18 330); animation: spin 1.8s linear infinite reverse; }
+  & span:nth-child(3) { inset: 1.5rem; background: radial-gradient(circle, var(--primary), transparent 70%); filter: blur(6px); animation: pulse-orb 1.4s ease-in-out infinite; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse-orb { 50% { transform: scale(1.35); opacity: .6; } }
+@keyframes fade-in { from { opacity: 0; } }
+@utility card-in { animation: card-in .6s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes card-in { from { opacity: 0; transform: translateY(12px); filter: blur(4px); } }

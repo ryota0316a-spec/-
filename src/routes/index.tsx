@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Sparkles, Copy, Check, ListChecks, Gavel, CalendarClock, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Sparkles, Copy, Check, ListChecks, Gavel, CalendarClock, Loader2, Mic, Square, UploadCloud } from "lucide-react";
+import { recordWav, transcribeFile } from "@/lib/audio";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -73,19 +74,52 @@ function ResultCard({
 
 const Empty = () => <p className="text-sm text-muted-foreground">要約するとここに表示されます。</p>;
 
+function fmtTime(s: number) {
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function Processing({ stage, live }: { stage: "transcribe" | "summarize"; live: string }) {
+  return (
+    <div className="processing-overlay">
+      <div className="orb"><span /><span /><span /></div>
+      <p className="text-gradient mt-8 text-lg font-semibold tracking-tight">文字起こし＆AI要約中...</p>
+      <div className="mt-4 flex items-center gap-3 font-mono text-[11px] tracking-widest">
+        <span className={stage === "transcribe" ? "text-foreground" : "text-muted-foreground"}>01 TRANSCRIBE</span>
+        <span className="h-px w-8 bg-border" />
+        <span className={stage === "summarize" ? "text-foreground" : "text-muted-foreground"}>02 SUMMARIZE</span>
+      </div>
+      {live && <p className="mt-5 line-clamp-3 max-w-sm text-center text-xs text-muted-foreground">{live.slice(-140)}</p>}
+    </div>
+  );
+}
+
 function Index() {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [stage, setStage] = useState<"transcribe" | "summarize" | null>(null);
+  const [live, setLive] = useState("");
   const [error, setError] = useState("");
   const [r, setR] = useState<Result | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [secs, setSecs] = useState(0);
+  const [level, setLevel] = useState(0);
+  const [drag, setDrag] = useState(false);
+  const recRef = useRef<{ stop: () => Promise<File> } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const run = async () => {
-    setLoading(true); setError("");
+  useEffect(() => {
+    if (!recording) return;
+    const t = setInterval(() => setSecs((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [recording]);
+
+  const summarize = async (input: string) => {
+    setLoading(true); setStage("summarize"); setError("");
     try {
       const res = await fetch("/api/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text: input }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "エラーが発生しました。");
@@ -93,7 +127,43 @@ function Index() {
     } catch (e: any) {
       setError(e.message);
     } finally {
-      setLoading(false);
+      setLoading(false); setStage(null);
+    }
+  };
+
+  const processAudio = async (file: File) => {
+    setError(""); setR(null); setLive(""); setLoading(true); setStage("transcribe");
+    try {
+      const t = await transcribeFile(file, setLive);
+      setText(t);
+      await summarize(t);
+    } catch (e: any) {
+      setError(e.message); setLoading(false); setStage(null);
+    }
+  };
+
+  const onFile = (f?: File | null) => {
+    if (!f) return;
+    if (!/\.(mp3|m4a|wav)$/i.test(f.name)) return setError("mp3 / m4a / wav ファイルを選んでください。");
+    if (f.size > 24 * 1024 * 1024) return setError("ファイルが大きすぎます（最大24MB）。");
+    void processAudio(f);
+  };
+
+  const toggleRec = async () => {
+    setError("");
+    if (recording) {
+      setRecording(false);
+      try {
+        const f = await recRef.current!.stop();
+        void processAudio(f);
+      } catch (e: any) { setError(e.message); }
+      return;
+    }
+    try {
+      recRef.current = await recordWav((v) => setLevel(v));
+      setSecs(0); setRecording(true);
+    } catch {
+      setError("マイクを使用できません。ブラウザのマイク許可を確認してください。");
     }
   };
 
@@ -114,29 +184,52 @@ function Index() {
 
         <div className="mb-10 max-w-2xl">
           <h1 className="text-gradient text-4xl font-semibold tracking-tight md:text-5xl">
-            会議を、数秒で意思決定に。
+            会議の録音を、数秒で意思決定に。
           </h1>
           <p className="mt-3 text-muted-foreground">
-            書き起こしやメモを貼り付けるだけ。要点・決定事項・次のアクションをAIが整理します。
+            録音するか音声ファイルを置くだけ。文字起こしから要点・決定事項・次のタスクまでAIが整理します。
           </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
-          <div className="glass flex flex-col p-5 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:max-h-[720px]">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground">TRANSCRIPT</p>
+          <div className="glass relative flex flex-col gap-4 overflow-hidden p-5">
+            {stage && <Processing stage={stage} live={live} />}
+
+            <button className={recording ? "btn-record is-recording" : "btn-record"} onClick={toggleRec} disabled={loading}>
+              <span className="rec-dot" style={recording ? { transform: `scale(${1 + level * 1.5})` } : undefined} />
+              {recording ? <Square className="size-4" /> : <Mic className="size-4" />}
+              {recording ? `録音を停止して要約する  ${fmtTime(secs)}` : "マイクで録音を開始する"}
+            </button>
+
+            <div
+              className={drag ? "dropzone is-drag" : "dropzone"}
+              onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={(e) => { e.preventDefault(); setDrag(false); if (!loading && !recording) onFile(e.dataTransfer.files[0]); }}
+              onClick={() => !loading && !recording && fileRef.current?.click()}
+              role="button"
+              aria-label="音声ファイルをアップロード"
+            >
+              <UploadCloud className="size-6 text-primary" />
+              <p className="text-sm font-medium text-foreground">音声ファイルをドラッグ＆ドロップ</p>
+              <p className="text-xs text-muted-foreground">または クリックして選択 · mp3 / m4a / wav · 最大24MB</p>
+              <input ref={fileRef} type="file" accept=".mp3,.m4a,.wav,audio/*" hidden onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-muted-foreground">TRANSCRIPT · テキストの貼り付けも可</p>
               <p className="font-mono text-xs text-muted-foreground">{text.length.toLocaleString()} 文字</p>
             </div>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="ここに会議のメモや書き起こしテキストを貼り付けてください…"
-              className="input-area min-h-[360px] flex-1"
+              placeholder="文字起こし結果がここに表示されます。会議メモを直接貼り付けることもできます…"
+              className="input-area min-h-[200px] flex-1"
             />
-            {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
-            <button className="btn-primary mt-4" onClick={run} disabled={loading || text.trim().length < 10}>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <button className="btn-primary" onClick={() => summarize(text)} disabled={loading || recording || text.trim().length < 10}>
               {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              {loading ? "要約中…" : "AIで要約する"}
+              {loading ? "処理中…" : "テキストをAIで要約する"}
             </button>
           </div>
 
