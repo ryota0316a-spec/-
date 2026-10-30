@@ -18,7 +18,7 @@ export const Route = createFileRoute("/api/summarize")({
         const { text } = (await request.json()) as { text?: string };
         if (!text || text.trim().length < 10)
           return Response.json({ error: "テキストが短すぎます。" }, { status: 400 });
-        const apiKey = process.env.LOVABLE_API_KEY;
+        const apiKey = process.env["LOVABLE_API_KEY"];
         if (!apiKey) return Response.json({ error: "AIの設定が見つかりません。" }, { status: 500 });
 
         const provider = createOpenAI({
