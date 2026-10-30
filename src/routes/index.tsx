@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, Copy, Check, ListChecks, Gavel, CalendarClock, Loader2, Mic, Square, UploadCloud, Globe, ChevronDown } from "lucide-react";
+import { Sparkles, Copy, Check, ListChecks, Gavel, CalendarClock, Loader2, Mic, Square, UploadCloud, Globe, ChevronDown, FileText } from "lucide-react";
 import { recordWav, transcribeFile } from "@/lib/audio";
 import { createContext, useContext } from "react";
 import { LANGS, T, isLang, type Lang } from "@/lib/i18n";
+import { TermsConsentDialog, TermsViewDialog } from "@/components/terms-dialog";
+import { TERMS_STORAGE_KEY, TERMS_VERSION } from "@/lib/terms";
 const LangCtx = createContext<Lang>("ja");
 const useT = () => T[useContext(LangCtx)];
 
@@ -102,6 +104,11 @@ function Index() {
   const t = T[lang];
   useEffect(() => { const v = localStorage.getItem("lang"); if (isLang(v)) setLangState(v); else { const n = navigator.language.slice(0, 2); if (isLang(n)) setLangState(n); } }, []);
   useEffect(() => { localStorage.setItem("lang", lang); document.documentElement.lang = lang; }, [lang]);
+  const [accepted, setAccepted] = useState<boolean | null>(null);
+  const [termsOpen, setTermsOpen] = useState(false);
+  useEffect(() => { setAccepted(localStorage.getItem(TERMS_STORAGE_KEY) === TERMS_VERSION); }, []);
+  const acceptTerms = () => { localStorage.setItem(TERMS_STORAGE_KEY, TERMS_VERSION); setAccepted(true); };
+  const locked = accepted !== true;
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState<"transcribe" | "summarize" | null>(null);
@@ -122,6 +129,7 @@ function Index() {
   }, [recording]);
 
   const summarize = async (input: string) => {
+    if (locked) return;
     setLoading(true); setStage("summarize"); setError("");
     try {
       const res = await fetch("/api/summarize", {
@@ -151,13 +159,14 @@ function Index() {
   };
 
   const onFile = (f?: File | null) => {
-    if (!f) return;
+    if (!f || locked) return;
     if (!/\.(mp3|m4a|wav)$/i.test(f.name)) return setError(t.badFile);
     if (f.size > 24 * 1024 * 1024) return setError(t.tooBig);
     void processAudio(f);
   };
 
   const toggleRec = async () => {
+    if (locked) return;
     setError("");
     if (recording) {
       setRecording(false);
@@ -188,14 +197,22 @@ function Index() {
             <span className="logo-mark" />
             <span className="text-sm font-semibold tracking-tight text-foreground">Minutes AI</span>
           </div>
-          <label className="lang-select">
-            <Globe className="size-3.5" />
-            <select aria-label="Language" value={lang} onChange={(e) => setLangState(e.target.value as Lang)}>
-              {(Object.keys(LANGS) as Lang[]).map((k) => <option key={k} value={k}>{LANGS[k].label}</option>)}
-            </select>
-            <ChevronDown className="size-3.5" />
-          </label>
+          <div className="flex items-center gap-2">
+            <button type="button" className="nav-link" onClick={() => setTermsOpen(true)}>
+              <FileText className="size-3.5" />
+              利用規約
+            </button>
+            <label className="lang-select">
+              <Globe className="size-3.5" />
+              <select aria-label="Language" value={lang} onChange={(e) => setLangState(e.target.value as Lang)}>
+                {(Object.keys(LANGS) as Lang[]).map((k) => <option key={k} value={k}>{LANGS[k].label}</option>)}
+              </select>
+              <ChevronDown className="size-3.5" />
+            </label>
+          </div>
         </nav>
+        <TermsConsentDialog open={accepted === false} onAccept={acceptTerms} />
+        <TermsViewDialog open={termsOpen && !locked} onOpenChange={setTermsOpen} />
 
         <div className="mb-10 max-w-2xl">
           <h1 className="text-gradient text-4xl font-semibold tracking-tight md:text-5xl">

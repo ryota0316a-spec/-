@@ -365,6 +365,39 @@
 @keyframes fade-in { from { opacity: 0; } }
 @utility card-in { animation: card-in .6s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes card-in { from { opacity: 0; transform: translateY(12px); filter: blur(4px); } }
+@utility terms-panel {
+  border-radius: 1.25rem;
+  border: 1px solid var(--glass-border);
+  background:
+    linear-gradient(160deg, oklch(1 0 0 / 7%), oklch(1 0 0 / 2%) 45%),
+    oklch(0.15 0.012 260 / 96%);
+  backdrop-filter: blur(28px) saturate(160%);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 12%), 0 40px 100px -30px oklch(0 0 0 / 90%);
+  outline: none;
+}
+@utility terms-scroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  border-radius: 0.9rem;
+  border: 1px solid var(--input);
+  background: oklch(0 0 0 / 28%);
+  padding: 1.25rem 1.5rem;
+  outline: none;
+  scrollbar-width: thin;
+  scrollbar-color: oklch(1 0 0 / 18%) transparent;
+  &:focus-visible { border-color: color-mix(in oklab, var(--ring) 60%, transparent); }
+}
+@utility terms-check {
+  width: 1rem; height: 1rem; flex-shrink: 0; cursor: pointer; accent-color: var(--primary);
+}
+@utility nav-link {
+  display: inline-flex; align-items: center; gap: .4rem; padding: .35rem .7rem;
+  border-radius: 999px; font-size: .75rem; color: color-mix(in oklab, var(--foreground) 80%, transparent);
+  background: oklch(1 0 0 / 6%); border: 1px solid oklch(1 0 0 / 14%); backdrop-filter: blur(12px);
+  transition: color .2s, border-color .2s;
+  &:hover { color: var(--foreground); border-color: oklch(1 0 0 / 26%); }
+}
 @utility lang-select {
   position: relative; display: inline-flex; align-items: center; gap: .4rem; padding: .35rem .7rem;
   border-radius: 999px; font-size: .75rem; color: var(--foreground);
