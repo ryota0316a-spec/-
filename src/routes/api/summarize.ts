@@ -33,7 +33,7 @@ export const Route = createFileRoute("/api/summarize")({
             model: provider.responses("openai/gpt-6-astra"),
             system:
               `You are an excellent business assistant. Read the meeting/sales-call transcript or notes and organize them concisely. Write ALL output strictly in ${L.ai}, regardless of the transcript's language. summary: 3-6 key bullet points; decisions: what was agreed; actions: next tasks (task/owner/due). If an owner or due date is unknown, use "${L.tbd}".`,
-            prompt: text.slice(0, 60000),
+            prompt: `Output language: ${L.ai}. Translate everything into ${L.ai}.\n\n---\n${text.slice(0, 60000)}`,
             output: Output.object({ schema }),
             abortSignal: request.signal,
             providerOptions: {
