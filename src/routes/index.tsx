@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Sparkles, Copy, Check, ListChecks, Gavel, CalendarClock, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Sparkles, Copy, Check, ListChecks, Gavel, CalendarClock, Loader2, Mic, Square, UploadCloud, Globe, ChevronDown } from "lucide-react";
+import { recordWav, transcribeFile } from "@/lib/audio";
+import { createContext, useContext } from "react";
+import { LANGS, T, isLang, type Lang } from "@/lib/i18n";
+const LangCtx = createContext<Lang>("ja");
+const useT = () => T[useContext(LangCtx)];
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -35,7 +40,7 @@ function CopyBtn({ text }: { text: string }) {
       }}
     >
       {ok ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-      {ok ? "コピー済み" : "コピー"}
+      {ok ? useT().copied : useT().copy}
     </button>
   );
 }
@@ -71,37 +76,111 @@ function ResultCard({
   );
 }
 
-const Empty = () => <p className="text-sm text-muted-foreground">要約するとここに表示されます。</p>;
+const Empty = () => <p className="text-sm text-muted-foreground">{useT().empty}</p>;
+
+function fmtTime(s: number) {
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function Processing({ stage, live }: { stage: "transcribe" | "summarize"; live: string }) {
+  return (
+    <div className="processing-overlay">
+      <div className="orb"><span /><span /><span /></div>
+      <p className="text-gradient mt-8 text-lg font-semibold tracking-tight">{useT().loadingTitle}</p>
+      <div className="mt-4 flex items-center gap-3 font-mono text-[11px] tracking-widest">
+        <span className={stage === "transcribe" ? "text-foreground" : "text-muted-foreground"}>01 TRANSCRIBE</span>
+        <span className="h-px w-8 bg-border" />
+        <span className={stage === "summarize" ? "text-foreground" : "text-muted-foreground"}>02 SUMMARIZE</span>
+      </div>
+      {live && <p className="mt-5 line-clamp-3 max-w-sm text-center text-xs text-muted-foreground">{live.slice(-140)}</p>}
+    </div>
+  );
+}
 
 function Index() {
+  const [lang, setLangState] = useState<Lang>("ja");
+  const t = T[lang];
+  useEffect(() => { const v = localStorage.getItem("lang"); if (isLang(v)) setLangState(v); else { const n = navigator.language.slice(0, 2); if (isLang(n)) setLangState(n); } }, []);
+  useEffect(() => { localStorage.setItem("lang", lang); document.documentElement.lang = lang; }, [lang]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [stage, setStage] = useState<"transcribe" | "summarize" | null>(null);
+  const [live, setLive] = useState("");
   const [error, setError] = useState("");
   const [r, setR] = useState<Result | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [secs, setSecs] = useState(0);
+  const [level, setLevel] = useState(0);
+  const [drag, setDrag] = useState(false);
+  const recRef = useRef<{ stop: () => Promise<File> } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const run = async () => {
-    setLoading(true); setError("");
+  useEffect(() => {
+    if (!recording) return;
+    const t = setInterval(() => setSecs((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [recording]);
+
+  const summarize = async (input: string) => {
+    setLoading(true); setStage("summarize"); setError("");
     try {
       const res = await fetch("/api/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text: input, lang }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "エラーが発生しました。");
+      if (!res.ok) throw new Error(data.error || t.error);
       setR(data);
     } catch (e: any) {
       setError(e.message);
     } finally {
-      setLoading(false);
+      setLoading(false); setStage(null);
+    }
+  };
+
+  const processAudio = async (file: File) => {
+    setError(""); setR(null); setLive(""); setLoading(true); setStage("transcribe");
+    try {
+      const t = await transcribeFile(file, lang, setLive);
+      setText(t);
+      await summarize(t);
+    } catch (e: any) {
+      setError(e.message); setLoading(false); setStage(null);
+    }
+  };
+
+  const onFile = (f?: File | null) => {
+    if (!f) return;
+    if (!/\.(mp3|m4a|wav)$/i.test(f.name)) return setError(t.badFile);
+    if (f.size > 24 * 1024 * 1024) return setError(t.tooBig);
+    void processAudio(f);
+  };
+
+  const toggleRec = async () => {
+    setError("");
+    if (recording) {
+      setRecording(false);
+      try {
+        const f = await recRef.current!.stop();
+        void processAudio(f);
+      } catch (e: any) { setError(e.message); }
+      return;
+    }
+    try {
+      recRef.current = await recordWav((v) => setLevel(v));
+      setSecs(0); setRecording(true);
+    } catch {
+      setError(t.noMic);
     }
   };
 
   const sumT = r?.summary.map((s) => `・${s}`).join("\n") ?? "";
   const decT = r?.decisions.map((s) => `・${s}`).join("\n") ?? "";
-  const actT = r?.actions.map((a) => `・${a.task}（担当: ${a.owner} / 期限: ${a.due}）`).join("\n") ?? "";
+  const actT = r?.actions.map((a) => `・${a.task}（${t.owner}: ${a.owner} / ${t.due}: ${a.due}）`).join("\n") ?? "";
 
   return (
+    <LangCtx.Provider value={lang}>
     <div className="aurora min-h-screen">
       <div className="mx-auto max-w-7xl px-6 py-8">
         <nav className="mb-10 flex items-center justify-between">
@@ -109,39 +188,68 @@ function Index() {
             <span className="logo-mark" />
             <span className="text-sm font-semibold tracking-tight text-foreground">Minutes AI</span>
           </div>
-          <span className="pill">Beta</span>
+          <label className="lang-select">
+            <Globe className="size-3.5" />
+            <select aria-label="Language" value={lang} onChange={(e) => setLangState(e.target.value as Lang)}>
+              {(Object.keys(LANGS) as Lang[]).map((k) => <option key={k} value={k}>{LANGS[k].label}</option>)}
+            </select>
+            <ChevronDown className="size-3.5" />
+          </label>
         </nav>
 
         <div className="mb-10 max-w-2xl">
           <h1 className="text-gradient text-4xl font-semibold tracking-tight md:text-5xl">
-            会議を、数秒で意思決定に。
+            {t.title}
           </h1>
           <p className="mt-3 text-muted-foreground">
-            書き起こしやメモを貼り付けるだけ。要点・決定事項・次のアクションをAIが整理します。
+            {t.sub}
           </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
-          <div className="glass flex flex-col p-5 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:max-h-[720px]">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground">TRANSCRIPT</p>
-              <p className="font-mono text-xs text-muted-foreground">{text.length.toLocaleString()} 文字</p>
+          <div className="glass relative flex flex-col gap-4 overflow-hidden p-5">
+            {stage && <Processing stage={stage} live={live} />}
+
+            <button className={recording ? "btn-record is-recording" : "btn-record"} onClick={toggleRec} disabled={loading}>
+              <span className="rec-dot" style={recording ? { transform: `scale(${1 + level * 1.5})` } : undefined} />
+              {recording ? <Square className="size-4" /> : <Mic className="size-4" />}
+              {recording ? `${t.stop}  ${fmtTime(secs)}` : t.rec}
+            </button>
+
+            <div
+              className={drag ? "dropzone is-drag" : "dropzone"}
+              onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={(e) => { e.preventDefault(); setDrag(false); if (!loading && !recording) onFile(e.dataTransfer.files[0]); }}
+              onClick={() => !loading && !recording && fileRef.current?.click()}
+              role="button"
+              aria-label="音声ファイルをアップロード"
+            >
+              <UploadCloud className="size-6 text-primary" />
+              <p className="text-sm font-medium text-foreground">{t.drop}</p>
+              <p className="text-xs text-muted-foreground">{t.dropSub}</p>
+              <input ref={fileRef} type="file" accept=".mp3,.m4a,.wav,audio/*" hidden onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-muted-foreground">{t.transcript}</p>
+              <p className="font-mono text-xs text-muted-foreground">{text.length.toLocaleString()}</p>
             </div>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="ここに会議のメモや書き起こしテキストを貼り付けてください…"
-              className="input-area min-h-[360px] flex-1"
+              placeholder={t.placeholder}
+              className="input-area min-h-[200px] flex-1"
             />
-            {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
-            <button className="btn-primary mt-4" onClick={run} disabled={loading || text.trim().length < 10}>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <button className="btn-primary" onClick={() => summarize(text)} disabled={loading || recording || text.trim().length < 10}>
               {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              {loading ? "要約中…" : "AIで要約する"}
+              {loading ? t.processing : t.summarize}
             </button>
           </div>
 
           <div className="space-y-5">
-            <ResultCard icon={<ListChecks className="size-4" />} index="01" title="概要・要約" copyText={sumT} loading={loading}>
+            <ResultCard icon={<ListChecks className="size-4" />} index="01" title={t.card1} copyText={sumT} loading={loading}>
               {r ? (
                 <ul className="space-y-2.5">
                   {r.summary.map((s, i) => (
@@ -153,7 +261,7 @@ function Index() {
               ) : <Empty />}
             </ResultCard>
 
-            <ResultCard icon={<Gavel className="size-4" />} index="02" title="決定事項" copyText={decT} loading={loading}>
+            <ResultCard icon={<Gavel className="size-4" />} index="02" title={t.card2} copyText={decT} loading={loading}>
               {r ? (
                 r.decisions.length ? (
                   <ul className="space-y-2.5">
@@ -163,11 +271,11 @@ function Index() {
                       </li>
                     ))}
                   </ul>
-                ) : <p className="text-sm text-muted-foreground">決定事項はありません。</p>
+                ) : <p className="text-sm text-muted-foreground">{t.noDecisions}</p>
               ) : <Empty />}
             </ResultCard>
 
-            <ResultCard icon={<CalendarClock className="size-4" />} index="03" title="次回アクション" copyText={actT} loading={loading}>
+            <ResultCard icon={<CalendarClock className="size-4" />} index="03" title={t.card3} copyText={actT} loading={loading}>
               {r ? (
                 r.actions.length ? (
                   <div className="divide-y divide-border">
@@ -179,12 +287,13 @@ function Index() {
                       </div>
                     ))}
                   </div>
-                ) : <p className="text-sm text-muted-foreground">アクションはありません。</p>
+                ) : <p className="text-sm text-muted-foreground">{t.noActions}</p>
               ) : <Empty />}
             </ResultCard>
           </div>
         </div>
       </div>
     </div>
+    </LangCtx.Provider>
   );
 }
