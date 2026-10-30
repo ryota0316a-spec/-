@@ -5,7 +5,7 @@ import { recordWav, transcribeFile } from "@/lib/audio";
 import { createContext, useContext } from "react";
 import { LANGS, T, isLang, type Lang } from "@/lib/i18n";
 import { TermsConsentDialog, TermsViewDialog } from "@/components/terms-dialog";
-import { TERMS_STORAGE_KEY, TERMS_VERSION } from "@/lib/terms";
+import { TERMS_STORAGE_KEY, TERMS_VERSION, getTerms } from "@/lib/terms";
 const LangCtx = createContext<Lang>("ja");
 const useT = () => T[useContext(LangCtx)];
 
@@ -200,7 +200,7 @@ function Index() {
           <div className="flex items-center gap-2">
             <button type="button" className="nav-link" onClick={() => setTermsOpen(true)}>
               <FileText className="size-3.5" />
-              利用規約
+              {getTerms(lang).ui.navLabel}
             </button>
             <label className="lang-select">
               <Globe className="size-3.5" />
@@ -211,8 +211,8 @@ function Index() {
             </label>
           </div>
         </nav>
-        <TermsConsentDialog open={accepted === false} onAccept={acceptTerms} />
-        <TermsViewDialog open={termsOpen && !locked} onOpenChange={setTermsOpen} />
+        <TermsConsentDialog open={accepted === false} lang={lang} onAccept={acceptTerms} />
+        <TermsViewDialog open={termsOpen && !locked} lang={lang} onOpenChange={setTermsOpen} />
 
         <div className="mb-10 max-w-2xl">
           <h1 className="text-gradient text-4xl font-semibold tracking-tight md:text-5xl">
