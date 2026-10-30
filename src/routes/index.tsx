@@ -233,7 +233,7 @@ function Index() {
 
             <div className="flex items-center justify-between">
               <p className="text-xs font-medium text-muted-foreground">{t.transcript}</p>
-              <p className="font-mono text-xs text-muted-foreground">{text.length.toLocaleString()} 文字</p>
+              <p className="font-mono text-xs text-muted-foreground">{text.length.toLocaleString()}</p>
             </div>
             <textarea
               value={text}
