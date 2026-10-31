@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, Copy, Check, ListChecks, Gavel, CalendarClock, Loader2, Mic, Square, UploadCloud, Globe, ChevronDown } from "lucide-react";
+import { Sparkles, Copy, Check, ListChecks, Gavel, CalendarClock, Loader2, Mic, Square, UploadCloud, Globe, ChevronDown, X, ScrollText } from "lucide-react";
 import { recordWav, transcribeFile } from "@/lib/audio";
 import { createContext, useContext } from "react";
 import { LANGS, T, isLang, type Lang } from "@/lib/i18n";
+import { getTerms } from "@/lib/terms";
 const LangCtx = createContext<Lang>("ja");
 const useT = () => T[useContext(LangCtx)];
 
@@ -82,6 +83,41 @@ function fmtTime(s: number) {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 }
 
+function TermsModal({ onClose }: { onClose: () => void }) {
+  const lang = useContext(LangCtx);
+  const t = useT();
+  const terms = getTerms(lang);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={terms.title}>
+      <div className="glass modal-panel" onClick={(e) => e.stopPropagation()}>
+        <header className="flex items-center justify-between gap-3 border-b border-border p-5">
+          <div className="flex items-center gap-3">
+            <span className="icon-chip"><ScrollText className="size-4" /></span>
+            <h2 className="text-sm font-semibold text-foreground">{terms.title}</h2>
+          </div>
+          <button className="btn-ghost" onClick={onClose} aria-label={t.close}>
+            <X className="size-3.5" />
+            {t.close}
+          </button>
+        </header>
+        <div className="terms-body">
+          {terms.sections.map((s) => (
+            <section key={s.heading}>
+              <h3>{s.heading}</h3>
+              {s.body.map((p, i) => <p key={i}>{p}</p>)}
+            </section>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Processing({ stage, live }: { stage: "transcribe" | "summarize"; live: string }) {
   return (
     <div className="processing-overlay">
@@ -99,9 +135,19 @@ function Processing({ stage, live }: { stage: "transcribe" | "summarize"; live: 
 
 function Index() {
   const [lang, setLangState] = useState<Lang>("ja");
+  const [langReady, setLangReady] = useState(false);
   const t = T[lang];
-  useEffect(() => { const v = localStorage.getItem("lang"); if (isLang(v)) setLangState(v); else { const n = navigator.language.slice(0, 2); if (isLang(n)) setLangState(n); } }, []);
-  useEffect(() => { localStorage.setItem("lang", lang); document.documentElement.lang = lang; }, [lang]);
+  useEffect(() => {
+    const v = localStorage.getItem("lang");
+    if (isLang(v)) setLangState(v);
+    else { const n = navigator.language.slice(0, 2); if (isLang(n)) setLangState(n); }
+    setLangReady(true);
+  }, []);
+  useEffect(() => {
+    if (!langReady) return;
+    localStorage.setItem("lang", lang);
+    document.documentElement.lang = lang;
+  }, [lang, langReady]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState<"transcribe" | "summarize" | null>(null);
@@ -112,6 +158,7 @@ function Index() {
   const [secs, setSecs] = useState(0);
   const [level, setLevel] = useState(0);
   const [drag, setDrag] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const recRef = useRef<{ stop: () => Promise<File> } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -188,13 +235,16 @@ function Index() {
             <span className="logo-mark" />
             <span className="text-sm font-semibold tracking-tight text-foreground">Minutes AI</span>
           </div>
-          <label className="lang-select">
-            <Globe className="size-3.5" />
-            <select aria-label="Language" value={lang} onChange={(e) => setLangState(e.target.value as Lang)}>
-              {(Object.keys(LANGS) as Lang[]).map((k) => <option key={k} value={k}>{LANGS[k].label}</option>)}
-            </select>
-            <ChevronDown className="size-3.5" />
-          </label>
+          <div className="flex items-center gap-4">
+            <button className="terms-link" onClick={() => setShowTerms(true)}>{t.terms}</button>
+            <label className="lang-select">
+              <Globe className="size-3.5" />
+              <select aria-label="Language" value={lang} onChange={(e) => setLangState(e.target.value as Lang)}>
+                {(Object.keys(LANGS) as Lang[]).map((k) => <option key={k} value={k}>{LANGS[k].label}</option>)}
+              </select>
+              <ChevronDown className="size-3.5" />
+            </label>
+          </div>
         </nav>
 
         <div className="mb-10 max-w-2xl">
@@ -292,7 +342,12 @@ function Index() {
             </ResultCard>
           </div>
         </div>
+
+        <footer className="mt-12 flex justify-center">
+          <button className="terms-link" onClick={() => setShowTerms(true)}>{t.terms}</button>
+        </footer>
       </div>
+      {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
     </div>
     </LangCtx.Provider>
   );

@@ -373,3 +373,23 @@
   & option { background: var(--popover); color: var(--popover-foreground); }
   &:hover { border-color: oklch(1 0 0 / 26%); }
 }
+@utility terms-link {
+  font-size: .75rem; color: var(--muted-foreground); text-decoration: underline;
+  text-underline-offset: 3px; text-decoration-color: oklch(1 0 0 / 25%);
+  transition: color .2s; cursor: pointer; background: none; border: none; padding: 0;
+  &:hover { color: var(--foreground); }
+}
+@utility modal-overlay {
+  position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem; background: oklch(0.05 0.01 270 / 70%); backdrop-filter: blur(10px);
+  animation: fade-in .25s ease;
+}
+@utility modal-panel {
+  width: 100%; max-width: 42rem; max-height: 82vh; display: flex; flex-direction: column;
+  animation: card-in .35s cubic-bezier(.2,.8,.2,1) both;
+}
+@utility terms-body {
+  overflow-y: auto; padding: 0 1.5rem 1.5rem;
+  & h3 { font-size: .85rem; font-weight: 600; color: var(--foreground); margin: 1.25rem 0 .4rem; }
+  & p { font-size: .8rem; line-height: 1.8; color: color-mix(in oklab, var(--foreground) 78%, transparent); margin-bottom: .35rem; }
+}
