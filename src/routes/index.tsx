@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, Copy, Check, ListChecks, Gavel, CalendarClock, Loader2, Mic, Square, UploadCloud, Globe, ChevronDown } from "lucide-react";
+import { Sparkles, Copy, Check, ListChecks, Gavel, CalendarClock, Loader2, Mic, Square, UploadCloud, Globe, ChevronDown, X, ScrollText } from "lucide-react";
 import { recordWav, transcribeFile } from "@/lib/audio";
 import { createContext, useContext } from "react";
 import { LANGS, T, isLang, type Lang } from "@/lib/i18n";
+import { getTerms } from "@/lib/terms";
 const LangCtx = createContext<Lang>("ja");
 const useT = () => T[useContext(LangCtx)];
 
@@ -80,6 +81,41 @@ const Empty = () => <p className="text-sm text-muted-foreground">{useT().empty}<
 
 function fmtTime(s: number) {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function TermsModal({ onClose }: { onClose: () => void }) {
+  const lang = useContext(LangCtx);
+  const t = useT();
+  const terms = getTerms(lang);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={terms.title}>
+      <div className="glass modal-panel" onClick={(e) => e.stopPropagation()}>
+        <header className="flex items-center justify-between gap-3 border-b border-border p-5">
+          <div className="flex items-center gap-3">
+            <span className="icon-chip"><ScrollText className="size-4" /></span>
+            <h2 className="text-sm font-semibold text-foreground">{terms.title}</h2>
+          </div>
+          <button className="btn-ghost" onClick={onClose} aria-label={t.close}>
+            <X className="size-3.5" />
+            {t.close}
+          </button>
+        </header>
+        <div className="terms-body">
+          {terms.sections.map((s) => (
+            <section key={s.heading}>
+              <h3>{s.heading}</h3>
+              {s.body.map((p, i) => <p key={i}>{p}</p>)}
+            </section>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Processing({ stage, live }: { stage: "transcribe" | "summarize"; live: string }) {
