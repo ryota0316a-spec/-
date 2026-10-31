@@ -16,6 +16,7 @@ type Dict = {
   transcript: string; placeholder: string; summarize: string; processing: string; loadingTitle: string;
   card1: string; card2: string; card3: string; empty: string; noDecisions: string; noActions: string;
   copy: string; copied: string; owner: string; due: string; badFile: string; tooBig: string; noMic: string; error: string;
+  terms: string; close: string;
 };
 
 export const T: Record<Lang, Dict> = {
