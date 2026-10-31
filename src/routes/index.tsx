@@ -135,9 +135,19 @@ function Processing({ stage, live }: { stage: "transcribe" | "summarize"; live: 
 
 function Index() {
   const [lang, setLangState] = useState<Lang>("ja");
+  const [langReady, setLangReady] = useState(false);
   const t = T[lang];
-  useEffect(() => { const v = localStorage.getItem("lang"); if (isLang(v)) setLangState(v); else { const n = navigator.language.slice(0, 2); if (isLang(n)) setLangState(n); } }, []);
-  useEffect(() => { localStorage.setItem("lang", lang); document.documentElement.lang = lang; }, [lang]);
+  useEffect(() => {
+    const v = localStorage.getItem("lang");
+    if (isLang(v)) setLangState(v);
+    else { const n = navigator.language.slice(0, 2); if (isLang(n)) setLangState(n); }
+    setLangReady(true);
+  }, []);
+  useEffect(() => {
+    if (!langReady) return;
+    localStorage.setItem("lang", lang);
+    document.documentElement.lang = lang;
+  }, [lang, langReady]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState<"transcribe" | "summarize" | null>(null);
