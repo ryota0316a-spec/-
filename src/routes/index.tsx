@@ -148,6 +148,7 @@ function Index() {
   const [secs, setSecs] = useState(0);
   const [level, setLevel] = useState(0);
   const [drag, setDrag] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const recRef = useRef<{ stop: () => Promise<File> } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -224,13 +225,16 @@ function Index() {
             <span className="logo-mark" />
             <span className="text-sm font-semibold tracking-tight text-foreground">Minutes AI</span>
           </div>
-          <label className="lang-select">
-            <Globe className="size-3.5" />
-            <select aria-label="Language" value={lang} onChange={(e) => setLangState(e.target.value as Lang)}>
-              {(Object.keys(LANGS) as Lang[]).map((k) => <option key={k} value={k}>{LANGS[k].label}</option>)}
-            </select>
-            <ChevronDown className="size-3.5" />
-          </label>
+          <div className="flex items-center gap-4">
+            <button className="terms-link" onClick={() => setShowTerms(true)}>{t.terms}</button>
+            <label className="lang-select">
+              <Globe className="size-3.5" />
+              <select aria-label="Language" value={lang} onChange={(e) => setLangState(e.target.value as Lang)}>
+                {(Object.keys(LANGS) as Lang[]).map((k) => <option key={k} value={k}>{LANGS[k].label}</option>)}
+              </select>
+              <ChevronDown className="size-3.5" />
+            </label>
+          </div>
         </nav>
 
         <div className="mb-10 max-w-2xl">
@@ -328,7 +332,12 @@ function Index() {
             </ResultCard>
           </div>
         </div>
+
+        <footer className="mt-12 flex justify-center">
+          <button className="terms-link" onClick={() => setShowTerms(true)}>{t.terms}</button>
+        </footer>
       </div>
+      {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
     </div>
     </LangCtx.Provider>
   );
